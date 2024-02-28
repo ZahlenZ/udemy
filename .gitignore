@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 # Data
 data/*
 
+=======
+>>>>>>> main
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
