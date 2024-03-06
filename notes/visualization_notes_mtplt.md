@@ -315,7 +315,7 @@ ax.set_title("nifty title")
 ax.scatter(
     x-axis-series,
     y-axis-series,
-    size=,
+    s=, # if there is another variable you want to control size with, bubble plot
     alpha=
 )
 ```
@@ -331,3 +331,110 @@ ax.hist(
     alpha=,
     bins=
 )
+```
+
+# Advanced Customization
+
+
+### Subplots
+
+grid of equal sized charts in single figure
+row, column
+00 01
+01 11
+
+sharex & sharey
+
+```python
+fig, ax = plt.subplots(
+    rows, 
+    columns,
+    figsize=(),
+    sharex="all" # all share x axis, also options are row and col
+    sharey="" # "all" share x axis, also options are row and col
+)
+
+ax[0][0].hist()
+ax[0][1].bar()
+```
+
+### gridspec
+multiple charts that are unequally sized
+
+each chart can occupy some combination of squares in the gridspec
+
+```python
+import matplotlib.gridspec as gridspec
+fig = plt.figure(figsize=(10, 10))
+gs = gridspec.GridSpec(ncols=4, nrows=8)
+
+ax1 = fig.add_subplot(gs[0: 4, 0: 2)) # slicing rows then columns
+```
+
+### color maps
+
+```python
+plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.Set2.colors)
+```
+
+### style sheets
+
+plt.style.use("fivethirtyeight")
+
+```python
+import seaborn as sns
+
+sns.set_style("darkgrid")
+```
+
+### modifying parameters
+rc()
+
+```python
+plt.rc("axes.spines", right=False, top=False)
+plt.rx("axes", titlesize=20)
+plt.rcParams["figure.figsize"] = (8, 6)
+```
+
+```python
+import matplotlib.font_manager
+matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext="ttf")
+
+print(plt.style.available)
+
+plt.rcParams.keys()
+```
+
+```python
+axes_settings = {
+    "spines.top": False,
+    "spines.right": False,
+    "facecolor": (0, 0, 0, .1),
+    "facealpha": .4,
+    "grid": True,
+    "grid.axis": y
+}
+
+plt.rc("axes", **axes_settings)
+
+### Saving Figures
+
+```python
+
+savefig(file_path, dpi=100) # 100 is the default
+
+```
+
+.png, .jpeg .svg .pdf
+matplotlib can do about any of them
+default filetype = png
+
+
+### autocorrelation
+
+```python
+ax.acorr(
+    series,
+    maxlags=n
+)
+
