@@ -97,6 +97,7 @@ sns.pairplot(
     hue="",
     palette="",
     corner=True # corner true will only show the lower left diagonal and not the inverse of it in the upper diagonal
+    diag_kind="kde" # "auto" "hist" "kde" None
 )
 ```
 
@@ -187,4 +188,31 @@ sns.swarmplot(
     hue="",
     dodge=True
 )
+```
+
+### correlation matrix view
+
+```python
+corrmat = df.corr()
+f, ax = plt.subplots(figsize=(n,m))
+sns.heatmap(corrmat, vmax=.8, square=True)
+```
+
+getting the largest k correlated
+```python
+k = 10
+cols = corrmat.nlargest(k, 'dependent')['dependent'].index
+cm = np.corrcoef(df[cols].values.T)
+sns.set(font_scale=1.25)
+hm = sns.heatmap(
+    cm, 
+    cbar=True, 
+    annot=True, 
+    square=True, 
+    fmt=".2f", 
+    annot_kws={"size": 10}, 
+    yticklabels=cols.values, 
+    xticklabels=cols.values
+)
+plt.show()
 ```

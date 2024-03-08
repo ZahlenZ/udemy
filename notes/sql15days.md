@@ -48,3 +48,83 @@ CASE
     WHEN conditionN THEN resultN
     ELSE result
 END AS column_name
+
+
+DATATYPES
+
+NUMERIC
+    - int
+    - smallint
+    - bigint
+    - numeric (float)
+    - serial (autoincrementing integer)
+STRING
+    - varchar
+    - character
+    - text
+DATE/TIME
+    - date
+    - time (with/without timezone)
+    - timestamp (date and time)
+    - intervals
+BOOLEAN
+    - TRUE/FALSE/NULL
+ENUM
+    - list of ordered values
+ARRAY
+    - stores a list of values
+
+CONTSTRAINTS
+    - NOT NULL
+    - UNIQUE
+    - DEFAULT
+    - PRIMARY KEY
+    - REFERENCES (used for foreign keys)
+    - CHECK (ensure values in column follow logic)
+
+CREATE TABLE <table name> (
+    column_name1 TYPE CONSTRAINT,
+    column_name2 TYPE CONSTRAINT
+)
+
+order of values needs to match order of columns in table
+INSERT INTO <table name> 
+VALUES (value1, ..., valueN,)
+
+INSERT INTO <table name>
+(column1, ..., columnN)
+(value1, ... , valueN)
+(anotherrowvalue, ..., anotherrowvalueN)
+
+ALTER <table name>
+ALTER_ACTION
+
+- DROP
+- ADD
+- TYPE
+- ALTER <columnname> TYPE <newtype>
+- RENAME
+
+
+ALTER <table name>
+ALTER ACTION row TYPE CONTSTRAINT
+
+DROP <object> <name>
+
+DROP TABLE<table name>
+
+DROP SCHEMA <schema_name>
+
+delete all of the data in the table
+TRUNCATE <table name>
+
+
+CREATE TABLE <table name> (
+    <column name> TYPE CHECK(condition)
+)
+
+can add a name to contstraint by adding CONSTRAINT <'constraint name'>
+default <table>_<column>_<constraint_check>
+CREATE TABLE director (
+    name TEXT CONSTRAINT name_length CHECK (length(name) > 1)
+)

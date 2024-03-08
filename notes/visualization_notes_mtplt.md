@@ -329,7 +329,8 @@ ax.hist(
     series,
     density=False, # if set to true use relative frequencies, percent of total
     alpha=,
-    bins=
+    bins=,
+    
 )
 ```
 
