@@ -475,7 +475,7 @@ dates.interpolate()
 ```python
 # will shift down by n row
 # positive for forward, negative for backward
-series.shit(n)
+series.shift(n)
 
 # example growth over time
 (dates / dates.shit(1)).sub(1).mul(100).round(2)
