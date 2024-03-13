@@ -10,7 +10,8 @@ import xgboost as xgb
 
 from datetime import datetime
 from numpy.random import default_rng
-from sklearn import tree
+from sklearn import svm, tree
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import(
     BaggiingClassifier,
     RandomForestClassifier,
@@ -27,8 +28,15 @@ from skleanr.model_selection import (
     train_test_split,
     GridSearchCV
 )
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preproccessing import StandardScaler
+from sklearn.svm import SVR
 from sklearn.tree import plot_tree
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.ar_model import AR
+from statsmodels.tsa.arima_model import ARIMA
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 ```
 
 
@@ -37,6 +45,11 @@ from sklearn.tree import plot_tree
 ```python
 # Importing Data
 pd.read_csv() 
+# import the data as a series instead of dataframe (time series with only one attribute)
+pd.read_csv().squeeze("columns")
+
+# pandas series
+pd.series([1, 2, 3], dtype=np,int8, name="numbers")
 
 # EDA
 df.head(n)
@@ -536,6 +549,10 @@ bag_clf = BaggingClassifier(
 )
 bag_clf.fit(X, y)
 
+# LDA
+clf_lda = LinearDiscriminantAnalysis()
+clf_lda.fit(X, y)
+
 # gradient boosting
 gbc_clf = GradientBoostingClassifier(
     learning_rate=.02,
@@ -550,6 +567,25 @@ ada_clf = AdaBoostClassifier(
     n_estimators=1000
 )
 ada_clf.fit(X, y)
+
+# KNN Model
+# sensitive to wide distributions need to scale or normalize data before using
+clf_knn = KNeighborsClassifier(n_neighbors=1)
+clf_knn.fit(X_train, y_train)
+
+# Regression SVM Linear
+# default kernal is RBF (radial) documentation has the other methods
+svr = SVR(kernel="linear", C=1000)
+svr.fit(X_train, y_train)
+
+# Classification Model
+clf_svm = svm.SVC(kernel="linear", C=0.01)
+
+# Classification model
+clf_svm = svm.SVC(kernel="polynomial", degree=2, C=0.01)
+
+# Classification model
+clf_svm = svm.SVC(kerneal="rbf", gamma=0.5, C=10)
 
 # grid search
 params={
@@ -636,10 +672,15 @@ dates.bfill()
 dates.astype("float64")
 dates.interpolate()
 
-# differencing
+# differencing downsampling
 dates.diff()
-dates.resample("M").sum()
+dates.resample("M", on="column").sum()
 dates.resample("M").transform("sum")
+
+# upsampling - just resample on a higher frequency the add in data
+df.resample("M", on="column").mean()
+df.interpolate(method=["linear", "spline"], order=2) # order required for spline, spline is polynomial curve
+
 ```
 
 # strings
@@ -723,3 +764,96 @@ ftp.close()
 ssh.close()
 ```
 
+# Time series 
+
+```python
+#read csv to set index as date
+pd.read_csv(
+    filepath,
+    parse_date=[0], # column index
+    index=0 # column index
+).squeeze("columns") # will make it a series
+
+time_series = df["value column of series"]
+figure = plot_acf(time_series)
+figure = plot_pacf(time_series)
+plt.show()
+```
+
+```python
+df = df.assign(
+    month=df["date"].dt.month,
+    day=df["date"].dt.day,
+    year=df["date"].dt.year,
+    lag1=df["births"].shift(1),
+    lag2=df["births"].shift(2),
+    last_year=df["births"].shift(365),
+    roll_mean=df["births"].rolling(window=2, center=False).mean(), # can set the window label as the center or the right edge(false)
+    rolling_max=df["births"].rolling(window=3).max(),
+    expand_max=df["births"].expanding().max()
+)
+```
+
+```python
+# observerd, trend, seasonal, redisduals
+result = seasonal_decompose(df["column"], model=["additive", "multiplicative"]) # series must have a datetime index
+result.plot()
+```
+
+```python
+# differencing (difference between time slot and its lagged value)
+df["column"].diff(periods=1)
+```
+
+```python
+# test, train, split
+train_size = int(df.shape[0] * 0.8)
+train_set = df.iloc(0: train_size, :)
+test_set = df.iloc(train_size: 0, :)
+```
+
+```python
+# naive forecast
+# just use the shift(1) value as the prediction
+```
+
+```python
+# auto regressive model
+# create train and test
+ar_model = AR(train)
+ar_fit = ar_model.fit()
+# lag values in model
+ar_fit.k_ar
+# coefficients for lagged variables
+ar_fit.params
+# if the data set is just one long set
+predictions = ar_fit.predict(start=len(train), end=len(train) + len(test) - 1)
+```
+
+```python
+# ARIMA
+model = ARIMA(df["column"], order=(p,d,q))
+model_fit = model.fit()
+model.summary()
+model.resid
+```
+
+```python
+# walk forward validation
+data = train
+predict = []
+for t in test:
+    model = ARIMA(data, order=(p, d, q)) # or model = AR()
+    model_fit = model.fit()
+    y = model_fit.forecast()
+    predict.append(y[0][0])
+    data = np.append(data, t)
+    data = pd.series(data)
+```
+
+```python
+# SARIMAX in python (p, d, q)(P, D, Q, m) where m is the number of time steps for a single seasonal period (how many lags essentialy)
+model = SARIMAX(df["column"], order=(p, d, q), season_order=(P, D, Q, m))
+model_fit = model.fit()
+residual = model_fit.resid
+ourpute = model_fit.forecast()
