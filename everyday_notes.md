@@ -9,7 +9,22 @@ import seaborn as sns
 import xgboost as xgb
 
 from datetime import datetime
+from feature_engine.selection import (
+    DropConstantFeatures, 
+    DropDuplicateFeatures,
+    DropCorrelatedFeatures,
+    SmartCorrelatedSelection,
+    SelectBySingleFeaturePerformance,
+    SelectByTargetMeanPerformance,
+    SelectByShuffling,
+    RecursiveFeatureElimination
+)
+from mlxtend.feature_selection import (
+    SequentialFeatureSelector as SFS,
+    ExhaustiveFeatureSelector as EFS
+)
 from numpy.random import default_rng
+from scipy.stats import chi2_contingency
 from sklearn import svm, tree
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import(
@@ -17,6 +32,23 @@ from sklearn.ensemble import(
     RandomForestClassifier,
     GradientBoosting,
     AdaBoostClassifier
+)
+from sklearn.feature_selection import (
+    VarianceThreshold,
+    mutual_info_classif,
+    mutual_info_regression,
+    SelectKBest,
+    SelectPercentile,
+    f_classif,
+    f_regression,
+    SequentialFeatureSelector as SFS,
+    SelectFromModel,
+    RFE
+)
+from sklearn.linear_model import (
+    LogisticRegression,
+    LinearRegression,
+    Lasso
 )
 from sklearn.metrics import (
     accuracy_score,
@@ -26,9 +58,11 @@ from sklearn.metrics import (
 )
 from skleanr.model_selection import (
     train_test_split,
-    GridSearchCV
+    GridSearchCV,
+    cross_validate
 )
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
 from sklearn.preproccessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.tree import plot_tree
@@ -437,6 +471,10 @@ sns.swarmplot(
 ### Correlation
 
 ```python
+df.corr(method=["pearson", "spearman", "kendall"])
+```
+
+```python
 sns.heatmap(
     data=df.corr(),
     # Not sure 
@@ -472,6 +510,25 @@ sns.heatmap(
     yticklables=cols.values,
     xticklables=cols.vaues
 )
+```
+
+getting the largest k correlated
+```python
+k = 10
+cols = corrmat.nlargest(k, 'dependent')['dependent'].index
+cm = np.corrcoef(df[cols].values.T)
+sns.set(font_scale=1.25)
+hm = sns.heatmap(
+    cm, 
+    cbar=True, 
+    annot=True, 
+    square=True, 
+    fmt=".2f", 
+    annot_kws={"size": 10}, 
+    yticklabels=cols.values, 
+    xticklabels=cols.values
+)
+plt.show()
 ```
 
 ### facet grids
@@ -857,3 +914,347 @@ model = SARIMAX(df["column"], order=(p, d, q), season_order=(P, D, Q, m))
 model_fit = model.fit()
 residual = model_fit.resid
 ourpute = model_fit.forecast()
+```
+
+# Feature Selection
+
+### constant features
+```python
+sel = VarianceThreshold(threshold=0) # by default it finds 0 variance features
+se.fit(X_train) # fit find the features with 0 variance
+```
+```python
+constant = [col for col in X.columns if X[col].std() == 0]
+
+# to also handle categorical first cast as object
+X = X.astype("O")
+constant = [col for col in X.columns if X[col].nunique() == 1]
+```
+
+### Quasi constant features
+
+```python
+quasi_constant_feat = []
+
+for feat in X_train.columns:
+    predominant = (
+        (X_train[feat].value_counts() / float(len(X_train)))
+        .sort_values(ascending=False)
+        .values[0]
+    )
+    if predominant > 0.999:
+        quasi_constant_feat.append(feat)
+```
+
+```python
+sel = DropConstantFeatures(tol=0.998, variables=None, missing_values="raise")
+sel.fit(X_train)
+sel.feature_to_drop_
+X_train = sel.transform(X_train)
+```
+
+### duplicated features
+```python
+duplicated_feat_pairs = {}
+_duplicated_feat = []
+
+for i in range(len(X_train.columns)):
+    feat_1 = X_train.columns[i]
+    if feat_1 not in _duplicated_feat:
+        duplicated_feat_pairs[feat_1] = []
+        for feat_2 in X_train.columns[i + 1:]:
+            if X_train[feat_1].equals(X_train[feat_2]):
+                duplicated_feat_pairs[feat_1].append(feat_2)
+                _duplicated_feat.append(feat_2)
+```
+
+### Correlated Features
+
+```python
+sel = DropCorrelatedFeatures(
+    threshold=0.8,
+    method="pearson",
+    missin_values="ignore"
+)
+sel.fit(X_train)
+X_train = sel.transform(X_train)
+```
+
+```python
+rf_clf = RandomForestClassifier(
+    n_estimators=100,
+    random_state=0,
+    n_jobs=-1
+)
+sel = SmartCorrelatedSelection(
+    variables=None,
+    method="pearson",
+    threshold=0.8,
+    missing_values="ignore",
+    selection_method="model_performance",
+    estimator=rf_clf,
+    scoring="roc_auc",
+    cv=3
+)
+sel.fit(X_train, y_train)
+group = sel.correlated_feature_sets_[i]
+X_train[group].std()
+
+sel.features_to_drop_
+```
+
+
+
+# pipeline
+
+```python
+pipe = Pipeline(
+    [
+        ("constant", DropConstantFeature(tol=.998)),
+        ("duplicated", DropDuplicateFeatures())
+    ]
+)
+
+pipe.fit(X_train)
+
+X_train = pipe.transform(X_train)
+X_test = pipe.transform(X_test)
+
+len(pipe.named_stesps["constant"].features_to_drop_)
+pipe.named_steps["duplicated"].features_to_drop_
+```
+
+correlated features pipline
+
+```python
+pipe = Pipeline([
+    ("constant", DropConstantFeatures(tol=0.998)),
+    ("duplicated", DropDuplicatedFeatures()),
+    ("correlation", SmartCorrelatedSelection(
+        method="pearson",
+        threshold=0.8,
+        missing_values="ignore",
+        selection_method="model_performance", # or "variance"
+        estimator=rf_clf,
+        scoring="roc_auc",
+        cv=3
+    ))
+])
+
+pipe.fit(X_train, y_train)
+X_train = pipe.transfrom(X_train)
+X_test = pipe.transform(X_test)
+
+def run_logistic(X_train, X_test, y_train, y_test):
+    
+    # function to train and test the performance of logistic regression
+    logit = LogisticRegression(random_state=44, max_iter=500)
+    logit.fit(X_train, y_train)
+    print('Train set')
+    pred = logit.predict_proba(X_train)
+    print('Logistic Regression roc-auc: {}'.format(roc_auc_score(y_train, pred[:,1])))
+    print('Test set')
+    pred = logit.predict_proba(X_test)
+    print('Logistic Regression roc-auc: {}'.format(roc_auc_score(y_test, pred[:,1])))
+
+
+scaler = StandardScaler().fit(X_train)
+
+run_logistic(scaler.transform(X_train),
+             scaler.transform(X_test),
+                  y_train, y_test)
+```
+
+# mutual information
+
+```python
+mi = mutual_info_classif(X_train, y_train)
+mi = pd.Series(mi)
+mi.index = X_train.columns
+mi.sort_values(ascending=False)
+```
+
+```python
+sel = SelectKBest(mutual_info_classif, k=10).fit(X_train, y_train)
+X_train.columns[sel.get_support()]
+```
+# chi square
+
+```python
+c = pd.crosstab(y_train, X_train["columns"])
+chi2_contingency(c)
+
+chi_ls = []
+
+for feature in X_train.columns:
+    c = pd.crosstab(y_train, X_train[feature])
+    p_value = chi2_contingency(c)[1]
+    chi_ls.append(p_value)
+
+# select features with lowest p-values
+```
+
+# ANOVA p-values
+
+```python
+univariate = f_classif(X_train, y_train)
+p-values = pd.Series(univariate[1])
+uni_index = X_train.columns
+
+sel = SelectKBest(f_classif, k=10).fit(X_train, y_train)
+X_train.columns[sel.get_support()]
+X_train = sel.transform(X_train)
+```
+
+# Select by single feature importance
+
+```python
+sel = SelectBySingleFeaturePerformanc(
+    variables=None,
+    estimator=rf_clf,
+    scoring="roc_auc",
+    cv=3,
+    threshold=0.5
+)
+sel.fit(X_train, y_train)
+sel.feature_performance_
+
+X_train = sel.transform(X_train)
+X_test = sel.transform(X_test)
+```
+
+# select by target mean performance
+
+```python
+sel = SelectByTargetMeanPerformance(
+    variables=None, # automatically finds categorical and numerical variables
+    scoring="roc_auc", # the metric to evaluate performance
+    threshold=0.6, # the threshold for feature selection, 
+    bins=3, # the number of intervals to discretise the numerical variables
+    strategy="equal_frequency", # whether the intervals should be of equal size or equal number of observations
+    cv=2,# cross validation
+    regression=False, # whether this is regression or classification
+)
+
+sel.fit(X_train, y_train)
+
+sel.feature_performance_
+
+X_train = sel.transform(X_train)
+X_test = sel.transform(X_test)
+```
+
+# step forward Feature selection
+
+
+Can be done with mlxtend and scikit-learn
+```python
+sfs = SFS(
+    estimator=rf_clf,
+    k_features=10,
+    forward=True, # forward = False is backwards selection
+    floating=False,
+    scoring="roc_auc",
+    cv=3
+)
+
+selected_features = X_train.columns[list(sfs.k_feature_idx_)]
+```
+
+# exhaustive feature selection
+
+```python
+efs = EFS(
+    estimator=rf_clf,
+    min_features=1,
+    max_features=4,
+    scoring="roc_auc",
+    cv=2
+)
+efs.best_idx_
+selected_features = X_train.columns[list(efs.best_idx_)]
+```
+
+# from coefficients
+
+```python
+sel = SelectFromModel(
+    estimator=logistic_regression,
+    threshold="mean"
+)
+sel.fit(X_train, y_train) # careful to scale these features
+sel.get_support()
+selected_feat = X_train.columns[sel.get_support()]
+sel.estimator_.coef_
+```
+
+```python
+sel = SelectFromModel(
+    estimator=linear_regression
+)
+sel.fit(X_train, y_train) # careful to scale these features
+sel.get_support()
+selected_feat = X_train.columns[sel.get_support()]
+sel.estimator_.coef_
+```
+
+
+```python
+sel = SelectFromModel(
+    estimator=lasso
+)
+sel.fit(X_train, y_train) # careful to scale these features
+sel.get_support()
+selected_feat = X_train.columns[sel.get_support()]
+sel.estimator_.coef_
+```
+# select feature recursively
+
+```python
+sel = RFE(
+    estimator=RandomForestClassifier(),
+    n_features_to_select=10,
+)
+sel.fit(X_train, y_train) # careful to scale these features
+sel.get_support()
+selected_feat = X_train.columns[sel.get_support()]
+sel.estimator_.coef_
+```
+
+# feature select by shuffling
+
+```python
+sel = SelectByShuffling(
+    estimator=RandomForestClassifier(),
+    scoring="roc_auc",
+    threshold=0.05,
+    cv=3,
+    random_state=0
+)
+sel.fit(X_train, y_train)
+sel.initial_model_performance_
+sel.performance_drifts_
+X_train = sel.transform(X_train)
+X_test = sel.transform(X_test)
+```
+
+```python
+sel = RecursiveFeatureElimination(
+    variables=None, # automatically evaluate all numerical variables
+    estimator = model, # the ML model
+    scoring = 'roc_auc', # the metric we want to evalute
+    threshold = 0.0005, # the maximum performance drop allowed to remove a feature
+    cv=2, # cross-validation
+)
+
+# this may take quite a while, because
+# we are building a lot of models with cross-validation
+sel.fit(X_train, y_train)
+# performance of model trained using all features
+
+sel.initial_model_performance_
+X_train = sel.transform(X_train)
+X_test = sel.transform(X_test)
+
+X_train.shape, X_test.shape
+```

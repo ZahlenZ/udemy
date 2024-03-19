@@ -128,3 +128,42 @@ default <table>_<column>_<constraint_check>
 CREATE TABLE director (
     name TEXT CONSTRAINT name_length CHECK (length(name) > 1)
 )
+
+UPDATE table
+SET column = value
+WHERE condition
+
+DELETE table
+WHERE condition
+RETURNING *
+
+DELETE payment
+WHERE payment_id IN (17064, 17067)
+
+CREATE TABLE table name
+    AS
+SELECT * from customer
+
+CREATE VIEW name
+AS
+SELECT 
+    *
+FROM table
+WHERE first_name = "%C%"
+
+
+ALTER VIEW
+ALTER MATERIALIZED VIEW
+DROP VIEW
+
+CREATE OR REPLACE VIEW v_customer_info AS
+query
+
+using window functions
+
+AGG(aggregate_column) OVER(PARTITION BY partition_column)
+
+window function to get a running total (consider it being ordered by a payment_date)
+
+SELECT *
+    SUM(amount) OVER(ORDER BY payment_date) AS running_total
